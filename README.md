@@ -5,7 +5,7 @@
 1. Install [BCC](https://github.com/iovisor/bcc) and its Python bindings;
 2. Run command:
    ```
-   python3 -m pip install git+https://github.com/YangHanlin/simple-lock.git@main
+   sudo python3 -m pip install git+https://github.com/YangHanlin/simple-lock.git@main
    ```
 
 ## Usage
