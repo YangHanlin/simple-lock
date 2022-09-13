@@ -11,7 +11,8 @@ except ImportError:
 try:
     import bcc
 except ImportError:
-    print('Error: this package requires BCC Python bindings; see https://github.com/iovisor/bcc/blob/master/INSTALL.md')
+    print('Error: this package requires BCC Python bindings; see https://github.com/iovisor/bcc/blob/master/INSTALL.md', file=sys.stderr)
+    sys.exit(1)
 
 setup(
     name='simple-lock',
