@@ -1,0 +1,8 @@
+[submodule "c/dependencies/libbpf"]
+	path = c/dependencies/libbpf
+	url = https://github.com/libbpf/libbpf.git
+	branch = libbpf-v1.0.1
+[submodule "c/dependencies/bpftool"]
+	path = c/dependencies/bpftool
+	url = https://github.com/libbpf/bpftool.git
+	# There is no release branch for v7.0.0, so we should manually check out this version.
