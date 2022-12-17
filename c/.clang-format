@@ -1,0 +1,27 @@
+---
+BasedOnStyle: Google
+AccessModifierOffset: -4
+IncludeCategories:
+  - Regex: ^<ext/.*\.h>
+    Priority: -1
+    SortPriority: 0
+    CaseSensitive: false
+  - Regex: ^<.*\.h>
+    Priority: -2
+    SortPriority: 0
+    CaseSensitive: false
+  - Regex: ^<.*
+    Priority: -1
+    SortPriority: 0
+    CaseSensitive: false
+  - Regex: ^"vmlinux\.h"$
+    Priority: -3
+    SortPriority: 0
+    CaseSensitive: false
+  - Regex: .*
+    Priority: 1
+    SortPriority: 0
+    CaseSensitive: false
+IndentWidth: 4
+ObjCBlockIndentWidth: 4
+SpaceAfterCStyleCast: true
