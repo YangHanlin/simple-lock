@@ -14,7 +14,7 @@ IncludeCategories:
     Priority: -1
     SortPriority: 0
     CaseSensitive: false
-  - Regex: ^"vmlinux\.h"$
+  - Regex: ^"(.*/)?vmlinux\.h"$
     Priority: -3
     SortPriority: 0
     CaseSensitive: false
