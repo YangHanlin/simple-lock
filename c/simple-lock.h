@@ -1,20 +1,24 @@
-/* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
-/* Copyright (c) 2020 Facebook */
-
 #ifndef __SIMPLE_LOCK_H
 #define __SIMPLE_LOCK_H
 
+#ifndef TASK_COMM_LEN
 #define TASK_COMM_LEN 16
-#define MAX_FILENAME_LEN 127
+#endif
 
-struct event {
-    int pid;
-    int ppid;
-    unsigned exit_code;
-    unsigned long long duration_ns;
+#define DEVICE_ID_LENGTH 64
+
+enum device_event_type {
+    DEVICE_ATTACHED = 1,
+    DEVICE_DETACHED,
+};
+
+struct device_event {
+    unsigned long pid;
+    unsigned long long ts;
     char comm[TASK_COMM_LEN];
-    char filename[MAX_FILENAME_LEN];
-    bool exit_event;
+
+    enum device_event_type type;
+    char device_id[DEVICE_ID_LENGTH];
 };
 
 #endif /* __SIMPLE_LOCK_H */

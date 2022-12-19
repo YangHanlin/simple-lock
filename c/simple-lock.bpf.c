@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
-/* Copyright (c) 2020 Facebook */
-
 #include "vmlinux.h"
 
 #include <bpf/bpf_core_read.h>
@@ -9,100 +6,72 @@
 
 #include "simple-lock.h"
 
-char LICENSE[] SEC("license") = "Dual BSD/GPL";
+#ifdef to_usb_device
+#undef to_usb_device
+#endif /* to_usb_device */
 
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 8192);
-    __type(key, pid_t);
-    __type(value, u64);
-} exec_start SEC(".maps");
+#define to_usb_device(d) container_of(d, struct usb_device, dev)
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
     __uint(max_entries, 256 * 1024);
-} rb SEC(".maps");
+} ring_buffer SEC(".maps");
 
-const volatile unsigned long long min_duration_ns = 0;
+static inline void populate_common_fields(struct device_event *event) {
+    event->pid = bpf_get_current_pid_tgid();
+    event->ts = bpf_ktime_get_ns();
+    bpf_get_current_comm(&(event->comm), sizeof(event->comm));
+}
 
-SEC("tp/sched/sched_process_exec")
-int handle_exec(struct trace_event_raw_sched_process_exec *ctx) {
-    struct task_struct *task;
-    unsigned fname_off;
-    struct event *e;
-    pid_t pid;
-    u64 ts;
+static inline void copy_string_with_limit(const char *source, char *destination,
+                                          int limit) {
+    int i = 0;
+    for (; i < limit - 1 && source[i]; ++i) {
+        destination[i] = source[i];
+    }
+    destination[i] = '\0';
+}
 
-    /* remember time exec() was executed for this PID */
-    pid = bpf_get_current_pid_tgid() >> 32;
-    ts = bpf_ktime_get_ns();
-    bpf_map_update_elem(&exec_start, &pid, &ts, BPF_ANY);
+SEC("kprobe/usb_probe_device")
+int BPF_KPROBE(on_device_attached, struct device *device) {
+    struct usb_device *usb = to_usb_device(device);
+    char *serial = BPF_CORE_READ(usb, serial);
+    struct device_event event = {
+        .pid = 0,
+        .ts = 0,
+        .comm = {0},
+        .type = 0,
+        .device_id = {0},
+    };
 
-    /* don't emit exec events when minimum duration is specified */
-    if (min_duration_ns) return 0;
+    populate_common_fields(&event);
+    event.type = DEVICE_ATTACHED;
+    copy_string_with_limit(serial, event.device_id, DEVICE_ID_LENGTH);
 
-    /* reserve sample from BPF ringbuf */
-    e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
-    if (!e) return 0;
+    bpf_ringbuf_submit(&event, 0);
+    bpf_printk("Attached a USB device with ID '%s'\n", event.device_id);
 
-    /* fill out the sample with data */
-    task = (struct task_struct *) bpf_get_current_task();
-
-    e->exit_event = false;
-    e->pid = pid;
-    e->ppid = BPF_CORE_READ(task, real_parent, tgid);
-    bpf_get_current_comm(&e->comm, sizeof(e->comm));
-
-    fname_off = ctx->__data_loc_filename & 0xFFFF;
-    bpf_probe_read_str(&e->filename, sizeof(e->filename),
-                       (void *) ctx + fname_off);
-
-    /* successfully submit it to user-space for post-processing */
-    bpf_ringbuf_submit(e, 0);
     return 0;
 }
 
-SEC("tp/sched/sched_process_exit")
-int handle_exit(struct trace_event_raw_sched_process_template *ctx) {
-    struct task_struct *task;
-    struct event *e;
-    pid_t pid, tid;
-    u64 id, ts, *start_ts, duration_ns = 0;
+SEC("kprobe/usb_unbind_device")
+int BPF_KPROBE(on_device_detached, struct device *device) {
+    struct usb_device *usb = to_usb_device(device);
+    char *serial = BPF_CORE_READ(usb, serial);
+    struct device_event event = {
+        .pid = 0,
+        .ts = 0,
+        .comm = {0},
+        .type = 0,
+        .device_id = {0},
+    };
 
-    /* get PID and TID of exiting thread/process */
-    id = bpf_get_current_pid_tgid();
-    pid = id >> 32;
-    tid = (u32) id;
+    populate_common_fields(&event);
+    event.type = DEVICE_DETACHED;
+    copy_string_with_limit(serial, event.device_id, DEVICE_ID_LENGTH);
 
-    /* ignore thread exits */
-    if (pid != tid) return 0;
+    bpf_ringbuf_submit(&event, 0);
+    bpf_printk("Detached a USB device with ID '%s'", event.device_id);
 
-    /* if we recorded start of the process, calculate lifetime duration */
-    start_ts = bpf_map_lookup_elem(&exec_start, &pid);
-    if (start_ts)
-        duration_ns = bpf_ktime_get_ns() - *start_ts;
-    else if (min_duration_ns)
-        return 0;
-    bpf_map_delete_elem(&exec_start, &pid);
-
-    /* if process didn't live long enough, return early */
-    if (min_duration_ns && duration_ns < min_duration_ns) return 0;
-
-    /* reserve sample from BPF ringbuf */
-    e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
-    if (!e) return 0;
-
-    /* fill out the sample with data */
-    task = (struct task_struct *) bpf_get_current_task();
-
-    e->exit_event = true;
-    e->duration_ns = duration_ns;
-    e->pid = pid;
-    e->ppid = BPF_CORE_READ(task, real_parent, tgid);
-    e->exit_code = (BPF_CORE_READ(task, exit_code) >> 8) & 0xff;
-    bpf_get_current_comm(&e->comm, sizeof(e->comm));
-
-    /* send data to user-space for post-processing */
-    bpf_ringbuf_submit(e, 0);
     return 0;
 }
