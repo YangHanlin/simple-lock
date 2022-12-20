@@ -6,3 +6,7 @@
 	path = c/dependencies/bpftool
 	url = https://github.com/libbpf/bpftool.git
 	# There is no release branch for v7.0.0, so we should manually check out this version.
+[submodule "c/dependencies/cJSON"]
+	path = c/dependencies/cJSON
+	url = https://github.com/DaveGamble/cJSON.git
+    # There is no release branch for v1.7.15, so we should manually check out this version.

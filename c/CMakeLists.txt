@@ -39,6 +39,13 @@ ExternalProject_Add(bpftool
   STEP_TARGETS build
 )
 
+ExternalProject_Add(cJSON
+  PREFIX dependencies/cJSON
+  SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/cJSON
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/dependencies/cJSON/
+  STEP_TARGETS build
+)
+
 # Set BpfObject input parameters -- note this is usually not necessary unless
 # you're in a highly vendored environment (like libbpf-bootstrap)
 set(BPFOBJECT_BPFTOOL_EXE ${CMAKE_CURRENT_BINARY_DIR}/dependencies/bpftool/bootstrap/bpftool)
@@ -57,5 +64,8 @@ foreach(app ${apps})
   add_dependencies(${app_stem}_skel libbpf-build)
 
   add_executable(${app_stem} ${app_stem}.c)
+  add_dependencies(${app_stem} cJSON-build)
+  target_include_directories(${app_stem} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/dependencies/cJSON/include)
+  target_link_libraries(${app_stem} ${CMAKE_CURRENT_BINARY_DIR}/dependencies/cJSON/lib/libcjson.so)
   target_link_libraries(${app_stem} ${app_stem}_skel)
 endforeach()
